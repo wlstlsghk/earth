@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>지구 복사 평형과 온실효과 시뮬레이션</title>
+  <style>
+    :root {
+      --bg: #07111f;
+      --panel: #101f31;
+      --panel-2: #152a40;
+      --line: #2d4861;
+      --text: #f5f8fc;
+      --muted: #a9bfd2;
+      --yellow: #ffd84a;
+      --orange: #ff9e42;
+      --red: #ff6f7d;
+      --pink: #ff9ec6;
+      --cyan: #6edcf3;
+      --green: #67e1a2;
+      --danger: #ff8a77;
+      --shadow: 0 18px 45px rgba(0, 0, 0, .26);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 5%, rgba(57, 112, 163, .18), transparent 32rem),
+        linear-gradient(180deg, #06101d, #0a1725 55%, #07111f);
+      font-family: "Pretendard", "Noto Sans KR", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    button, input { font: inherit; }
+    button { color: inherit; }
+
+    .app {
+      width: min(1500px, 100%);
+      margin: 0 auto;
+      padding: 22px;
+    }
+
+    .hero {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0 0 5px;
+      font-size: clamp(1.5rem, 3vw, 2.35rem);
+      line-height: 1.15;
+      letter-spacing: -.04em;
+    }
+
+    .subtitle { margin: 0; color: var(--muted); }
+    .source-credit { display: block; margin-top: 4px; color: #7ee7ff; font-size: .8rem; font-weight: 700; letter-spacing: .02em; }
+    .model-badge {
+      flex: 0 0 auto;
+      padding: 8px 12px;
+      border: 1px solid #f4c755;
+      border-radius: 999px;
+      color: #ffe48d;
+      background: rgba(255, 216, 74, .08);
+      font-size: .88rem;
+      font-weight: 700;
+    }
+    .preflight-note {
+      margin-bottom: 16px;
+      padding: 13px 16px;
+      border: 1px solid #b68a2f;
+      border-left: 5px solid var(--yellow);
+      border-radius: 12px;
+      background: rgba(255,216,74,.07);
+      color: #dbe8f2;
+      font-size: .9rem;
+    }
+    .preflight-note strong { display: block; margin-bottom: 3px; color: #ffe17a; }
+    .preflight-note p { margin: 0; }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(16, 31, 49, .92);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .simulation-card { min-width: 0; }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(7, 17, 31, .45);
+    }
+
+    .toolbar-group { display: flex; flex-wrap: wrap; gap: 8px; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 40px;
+      padding: 8px 12px;
+      border: 1px solid #38536c;
+      border-radius: 10px;
+      background: #182c40;
+      cursor: pointer;
+      transition: transform .16s ease, background .16s ease, border-color .16s ease;
+    }
+    .btn:hover { background: #203a52; border-color: #6e91ae; }
+    .btn:active { transform: translateY(1px); }
+    .btn.primary { background: #176c8b; border-color: #45bde8; }
+    .btn[aria-pressed="true"] { background: #6c4d0a; border-color: var(--yellow); }
+
+    .step-readout {
+      min-width: 0;
+      color: var(--muted);
+      font-size: .9rem;
+      text-align: right;
+    }
+    .toolbar-status { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+    .step-readout strong { color: var(--text); }
+
+    .scene-wrap { position: relative; background: #07111f; }
+    #energyScene {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 16 / 10.4;
+      min-height: 490px;
+      touch-action: manipulation;
+    }
+
+    .scene-title {
+      font-size: 18px;
+      font-weight: 800;
+      fill: #f5f8fc;
+      paint-order: stroke;
+      stroke: rgba(7, 17, 31, .8);
+      stroke-width: 4px;
+    }
+    .scene-small {
+      font-size: 12px;
+      fill: #bcd0e0;
+    }
+    .flow-label {
+      font-size: 13px;
+      font-weight: 800;
+      fill: #ffffff;
+      paint-order: stroke;
+      stroke: #07111f;
+      stroke-width: 5px;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+    .zone-label {
+      font-size: 18px;
+      font-weight: 800;
+      fill: #eff7ff;
+      letter-spacing: .04em;
+    }
+    .zone-control { cursor: pointer; }
+    .zone-control rect { fill: rgba(7,17,31,.62); stroke: #6d91ae; stroke-width: 1.5; transition: fill .2s, stroke .2s; }
+    .zone-control:hover rect, .zone-control.selected rect { fill: rgba(255,216,74,.16); stroke: #ffd84a; }
+    .flow-hit { fill: none; stroke: transparent; stroke-width: 24; cursor: pointer; }
+    .flow-base { fill: none; stroke-linecap: round; transition: opacity .35s, stroke-width .5s, filter .35s; }
+    .flow-motion {
+      fill: none;
+      stroke: rgba(255,255,255,.72);
+      stroke-linecap: round;
+      pointer-events: none;
+      animation: stream 1.25s linear infinite;
+      transition: opacity .35s, stroke-width .5s;
+    }
+    .flow-group { opacity: .38; transition: opacity .3s; }
+    .flow-group.visible { opacity: .9; }
+    .flow-group.active { opacity: 1; filter: drop-shadow(0 0 8px rgba(255,255,255,.72)); }
+    .flow-group.activated {
+      opacity: .96;
+      filter: drop-shadow(0 0 7px rgba(255,255,255,.48));
+    }
+    .flow-group.selected {
+      opacity: 1;
+      filter: drop-shadow(0 0 5px rgba(255,255,255,.95)) drop-shadow(0 0 13px rgba(255,216,74,.8));
+    }
+    .flow-group.selected .flow-base { stroke-width: calc(var(--flow-width, 5px) + 2px) !important; }
+    .flow-group.selected .flow-label { fill: #fff4a8; }
+    .flow-group.zero-flow { opacity: 0 !important; pointer-events: none; }
+    .flow-group:hover { opacity: 1; }
+    .paused .flow-motion { animation-play-state: paused; }
+    @keyframes stream { to { stroke-dashoffset: -56; } }
+
+    .cloud { fill: #ddecf4; stroke: #ffffff; stroke-width: 2; }
+    .sun-ray { transform-origin: 180px 175px; animation: sunPulse 3s ease-in-out infinite; }
+    .paused .sun-ray { animation-play-state: paused; }
+    @keyframes sunPulse { 50% { opacity: .55; transform: scale(.92); } }
+    .surface-glow { transition: fill .6s, filter .6s; }
+
+    .boundary-box {
+      fill: rgba(6, 16, 29, .86);
+      stroke: #4d6f8d;
+      stroke-width: 1.5;
+    }
+    .boundary-main { font-size: 18px; font-weight: 800; fill: #fff; }
+    .boundary-sub { font-size: 12px; fill: #bcd0e0; }
+    .equilibrium-dot { transition: fill .4s; }
+
+    .flow-detail {
+      min-height: 76px;
+      padding: 12px 15px;
+      border-top: 1px solid var(--line);
+      background: #0c1928;
+    }
+    .flow-detail strong { color: #fff2a9; }
+    .flow-detail p { margin: 3px 0 0; color: var(--muted); }
+
+    .step-strip {
+      display: grid;
+      grid-template-columns: repeat(9, minmax(0, 1fr));
+      gap: 6px;
+      padding: 12px;
+      border-top: 1px solid var(--line);
+      background: rgba(7,17,31,.48);
+    }
+    .step-button {
+      min-height: 42px;
+      padding: 6px;
+      border: 1px solid #38536c;
+      border-radius: 9px;
+      background: #13263a;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .step-button:hover { color: white; border-color: #6e91ae; }
+    .step-button.active { color: #07111f; background: var(--yellow); border-color: var(--yellow); font-weight: 800; }
+
+    .side-panel { display: grid; gap: 16px; }
+    .panel-section { padding: 16px; }
+    .panel-section + .panel-section { border-top: 1px solid var(--line); }
+    .panel-title { margin: 0 0 12px; font-size: 1.05rem; }
+
+    .slider-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+    .slider-results { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 7px; }
+    .slider-value { color: #ffe17a; font-weight: 800; }
+    .equilibrium-progress {
+      padding: 3px 7px;
+      border: 1px solid #557087;
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(7,17,31,.5);
+      font-size: .76rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .equilibrium-progress.complete { color: #8ff0b8; border-color: #67e1a2; background: rgba(103,225,162,.08); }
+    .equilibrium-progress.moving { color: #ffd88a; border-color: #d49b3e; }
+    input[type="range"] { width: 100%; accent-color: var(--yellow); cursor: pointer; }
+    .range-labels { display: flex; justify-content: space-between; color: var(--muted); font-size: .72rem; }
+    .ghg-presets {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .ghg-preset {
+      min-width: 0;
+      padding: 7px 3px;
+      border: 1px solid #38536c;
+      border-radius: 8px;
+      background: #13263a;
+      color: var(--muted);
+      font-size: .75rem;
+      cursor: pointer;
+    }
+    .ghg-preset strong { display: block; color: var(--text); font-size: .9rem; }
+    .ghg-preset:hover { border-color: #7b9bb5; color: var(--text); }
+    .ghg-preset.active { border-color: var(--yellow); background: #6c4d0a; color: #fff1aa; }
+    .changed-value { color: #ff776f; font-weight: 800; }
+    .baseline-value { color: var(--text); font-weight: 800; }
+    .baseline-note { color: #ffaaa5; font-size: .78rem; white-space: nowrap; }
+    .range-note { margin: 10px 0 0; color: var(--muted); font-size: .85rem; }
+
+    .temp-box {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 12px;
+      margin-top: 15px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+    .thermometer {
+      height: 12px;
+      border-radius: 999px;
+      background: #07111f;
+      overflow: hidden;
+      border: 1px solid #3d5870;
+    }
+    .thermometer-fill {
+      height: 100%;
+      width: 35%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #55c8ee, #ffd24f, #ff675f);
+      transition: width .35s ease;
+    }
+    .temp-value { font-size: 1.35rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+    .balance {
+      padding: 15px;
+      border: 2px solid var(--green);
+      border-radius: 14px;
+      background: rgba(103, 225, 162, .07);
+      transition: border-color .35s, background .35s;
+    }
+    .balance.warming { border-color: var(--danger); background: rgba(255, 111, 125, .08); }
+    .balance.cooling { border-color: var(--cyan); background: rgba(110, 220, 243, .08); }
+    .balance-title { font-weight: 800; font-size: 1.08rem; }
+    .balance-equation { margin-top: 5px; font-size: .88rem; color: var(--muted); }
+    .balance-number { margin-top: 9px; font-size: 1.45rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+    .metrics { display: grid; grid-template-columns: 1fr auto; gap: 0; margin: 0; }
+    .metrics dt, .metrics dd { padding: 7px 0; border-bottom: 1px solid rgba(77,111,141,.42); }
+    .metrics dt { color: var(--muted); }
+    .metrics dd { margin: 0; text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .metrics .section-start { padding-top: 12px; color: #ffe17a; }
+
+    .formula {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-left: 3px solid var(--pink);
+      background: rgba(255, 158, 198, .07);
+      color: var(--muted);
+      font-size: .82rem;
+    }
+
+    details.theory { margin-top: 16px; }
+    details.theory > summary {
+      padding: 17px 20px;
+      cursor: pointer;
+      font-size: 1.12rem;
+      font-weight: 800;
+      list-style-position: inside;
+    }
+    .theory-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap: 1px;
+      border-top: 1px solid var(--line);
+      background: var(--line);
+    }
+    .theory-item { padding: 17px; background: var(--panel); }
+    .theory-item h3 { margin: 0 0 6px; font-size: 1rem; color: #ffe17a; }
+    .theory-item p { margin: 0; color: #c4d4e2; font-size: .91rem; }
+    .assumption { grid-column: 1 / -1; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 14px; padding: 0 16px 14px; color: var(--muted); font-size: .82rem; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .legend-line { width: 28px; height: 5px; border-radius: 4px; background: var(--yellow); }
+    .legend-line.longwave { background: var(--red); }
+    .legend-line.nonrad { background: var(--cyan); border-top: 2px dashed white; }
+
+    @media (max-width: 1050px) {
+      .main-grid { grid-template-columns: 1fr; }
+      .side-panel { grid-template-columns: 1fr 1fr; }
+      .side-panel .card:last-child { grid-column: 1 / -1; }
+    }
+    @media (max-width: 720px) {
+      .app { padding: 10px; }
+      .hero { align-items: flex-start; flex-direction: column; }
+      .toolbar { align-items: flex-start; flex-direction: column; }
+      .toolbar-status { width: 100%; justify-content: space-between; }
+      .step-readout { text-align: left; }
+      #energyScene { min-height: 0; }
+      .step-strip { grid-template-columns: repeat(3, 1fr); }
+      .ghg-presets { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .side-panel { grid-template-columns: 1fr; }
+      .side-panel .card:last-child { grid-column: auto; }
+      .theory-grid { grid-template-columns: 1fr; }
+      .assumption { grid-column: auto; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <div>
+        <h1>지구 복사 평형과 온실효과</h1>
+        <p class="subtitle">입사 태양복사 100을 기준으로 에너지의 이동과 새 평형을 탐구해 보세요.</p>
+        <small class="source-credit">자료 제작·출처: 부산국제고 강진영</small>
+      </div>
+      <div class="model-badge">⚠ 단순화된 교육용 모형 · 상대 단위</div>
+    </header>
+
+    <aside class="preflight-note" aria-label="시뮬레이션 유의점">
+      <strong>⚠ 시뮬레이션 전 유의점</strong>
+      <p>이 시뮬레이션은 대기층 하나, 고정된 구름과 알베도, 단순화한 열저장을 가정한 교육용 모형입니다. 실제 기후계에는 수증기 피드백, 구름 변화, 해양의 열 흡수, 에어로졸, 계절 및 지역 차이 등 복잡한 요소가 함께 작용합니다. 화면의 수치는 실제 W/m²나 실제 농도가 아니라 상대 단위입니다. 슬라이더의 0은 ‘온실기체만 0’인 현실 상태가 아니라 대기 전체를 제거한 비교용 극한 상태입니다.</p>
+    </aside>
+
+    <div class="main-grid">
+      <section class="card simulation-card" aria-label="에너지 흐름 시뮬레이션">
+        <div class="toolbar">
+          <div class="toolbar-group">
+            <button class="btn" id="playBtn" type="button" aria-pressed="false">▶ 재생</button>
+            <button class="btn" id="pauseBtn" type="button" aria-pressed="false">Ⅱ 일시정지</button>
+            <button class="btn primary" id="stepModeBtn" type="button" aria-pressed="true">☝ 단계별 보기 (기본)</button>
+          </div>
+          <div class="toolbar-status">
+            <div class="step-readout"><strong id="stepNumber">1단계</strong> · <span id="stepShort">태양 복사 유입</span></div>
+            <button class="btn" id="resetBtn" type="button">↺ 전체 초기화</button>
+          </div>
+        </div>
+
+        <div class="scene-wrap paused" id="sceneWrap">
+          <svg id="energyScene" viewBox="0 0 1000 650" role="img" aria-labelledby="sceneSvgTitle sceneSvgDesc">
+            <title id="sceneSvgTitle">지구 복사 평형 에너지 흐름도</title>
+            <desc id="sceneSvgDesc">우주, 대기와 구름, 지표 사이의 단파 및 장파 에너지 흐름을 움직이는 화살표로 보여 줍니다.</desc>
+            <defs>
+              <linearGradient id="spaceBg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#040b17"/><stop offset="1" stop-color="#0c2138"/></linearGradient>
+              <linearGradient id="airBg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#1a5077"/><stop offset="1" stop-color="#39779a"/></linearGradient>
+              <linearGradient id="groundBg" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#59463b"/><stop offset=".5" stop-color="#86644c"/><stop offset="1" stop-color="#4f4947"/></linearGradient>
+              <radialGradient id="sunFill"><stop offset="0" stop-color="#fff7b2"/><stop offset=".65" stop-color="#ffd43d"/><stop offset="1" stop-color="#ff9a2f"/></radialGradient>
+              <linearGradient id="groundGlow" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ffaf58"/><stop offset="1" stop-color="#81523e"/></linearGradient>
+              <filter id="glow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              <marker id="arrowYellow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#ffd84a"/></marker>
+              <marker id="arrowOrange" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#ff9e42"/></marker>
+              <marker id="arrowRed" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#ff6f7d"/></marker>
+              <marker id="arrowPink" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#ff9ec6"/></marker>
+              <marker id="arrowCyan" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#6edcf3"/></marker>
+            </defs>
+
+            <rect x="0" y="0" width="1000" height="210" fill="url(#spaceBg)"/>
+            <rect x="0" y="210" width="1000" height="265" fill="url(#airBg)"/>
+            <rect x="0" y="475" width="1000" height="175" fill="url(#groundBg)"/>
+            <path d="M0 475 Q140 455 280 475 T560 475 T840 475 T1120 475 L1000 520 L0 520Z" class="surface-glow" id="surfaceGlow" fill="url(#groundGlow)" opacity=".45"/>
+            <line x1="0" y1="210" x2="1000" y2="210" stroke="#5f87a7" stroke-width="2" stroke-dasharray="7 8"/>
+            <line x1="0" y1="475" x2="1000" y2="475" stroke="#c39a69" stroke-width="3"/>
+
+            <g opacity=".5" fill="#fff">
+              <circle cx="350" cy="70" r="1.4"/><circle cx="610" cy="120" r="1.8"/><circle cx="780" cy="58" r="1.2"/><circle cx="930" cy="140" r="1.5"/><circle cx="530" cy="36" r="1"/><circle cx="260" cy="150" r="1.2"/>
+            </g>
+            <g class="zone-control" data-zone="space" role="button" tabindex="0" aria-label="우주 경계면 에너지 수지 보기"><rect x="12" y="10" width="112" height="40" rx="9"/><text x="22" y="38" class="zone-label">① 우주</text></g>
+            <g class="zone-control" data-zone="atmosphere" role="button" tabindex="0" aria-label="대기와 구름 에너지 수지 보기"><rect x="12" y="218" width="178" height="40" rx="9"/><text x="22" y="245" class="zone-label">② 대기와 구름</text></g>
+            <g class="zone-control" data-zone="surface" role="button" tabindex="0" aria-label="지표 에너지 수지 보기"><rect x="12" y="586" width="112" height="40" rx="9"/><text x="22" y="616" class="zone-label">③ 지표</text></g>
+
+            <g aria-label="태양">
+              <g class="sun-ray" stroke="#ffd84a" stroke-width="4" stroke-linecap="round" opacity=".9">
+                <line x1="180" y1="91" x2="180" y2="73"/><line x1="180" y1="259" x2="180" y2="277"/><line x1="96" y1="175" x2="78" y2="175"/><line x1="264" y1="175" x2="282" y2="175"/>
+                <line x1="121" y1="116" x2="108" y2="103"/><line x1="239" y1="116" x2="252" y2="103"/><line x1="121" y1="234" x2="108" y2="247"/><line x1="239" y1="234" x2="252" y2="247"/>
+              </g>
+              <circle cx="180" cy="175" r="62" fill="url(#sunFill)" filter="url(#glow)"/>
+              <text x="180" y="181" text-anchor="middle" font-size="20" font-weight="800" fill="#6b3a00">태양</text>
+            </g>
+
+            <g aria-label="구름" transform="translate(0 5)">
+              <path class="cloud" d="M410 285 C410 267 426 254 445 258 C455 237 490 238 499 262 C525 255 544 274 539 296 L420 296 C414 294 410 290 410 285Z"/>
+              <path class="cloud" d="M675 330 C675 312 690 299 709 303 C720 282 753 284 762 307 C787 301 807 319 802 341 L685 341 C679 339 675 335 675 330Z" opacity=".8"/>
+              <text x="475" y="320" text-anchor="middle" class="scene-small">구름·대기</text>
+            </g>
+
+            <g id="flow-incoming" class="flow-group" data-step="1" data-flow="incoming">
+              <path class="flow-base" d="M255 195 C300 225 320 320 345 454" stroke="#ffd84a" marker-end="url(#arrowYellow)"/>
+              <path class="flow-motion" d="M255 195 C300 225 320 320 345 454"/>
+              <path class="flow-hit" d="M255 195 C300 225 320 320 345 454"/>
+              <text x="258" y="300" class="flow-label">태양 복사 <tspan id="svgIncoming">100</tspan> ↓</text>
+            </g>
+
+            <g id="flow-cloudReflect" class="flow-group" data-step="2" data-flow="cloudReflect">
+              <path class="flow-base" d="M402 278 C385 230 390 175 425 118" stroke="#ffd84a" marker-end="url(#arrowYellow)"/>
+              <path class="flow-motion" d="M402 278 C385 230 390 175 425 118"/>
+              <path class="flow-hit" d="M402 278 C385 230 390 175 425 118"/>
+              <text x="410" y="178" class="flow-label">구름·대기 반사 <tspan id="svgCloudReflect">26</tspan> ↑</text>
+            </g>
+
+            <g id="flow-surfaceReflect" class="flow-group" data-step="2" data-flow="surfaceReflect">
+              <path class="flow-base" d="M375 469 C420 390 454 255 486 120" stroke="#ff9e42" marker-end="url(#arrowOrange)"/>
+              <path class="flow-motion" d="M375 469 C420 390 454 255 486 120"/>
+              <path class="flow-hit" d="M375 469 C420 390 454 255 486 120"/>
+              <text x="424" y="395" class="flow-label">지표 반사 <tspan id="svgSurfaceReflect">4</tspan> ↑</text>
+            </g>
+
+            <g id="flow-atmSolar" class="flow-group" data-step="3" data-flow="atmSolar">
+              <path class="flow-base" d="M330 265 L430 335" stroke="#ffb447" marker-end="url(#arrowOrange)"/>
+              <path class="flow-motion" d="M330 265 L430 335"/>
+              <path class="flow-hit" d="M330 265 L430 335"/>
+              <text x="325" y="350" class="flow-label">대기 흡수 <tspan id="svgAtmSolar">25</tspan></text>
+            </g>
+
+            <g id="flow-surfaceSolar" class="flow-group" data-step="3" data-flow="surfaceSolar">
+              <path class="flow-base" d="M345 390 L345 467" stroke="#ff9e42" marker-end="url(#arrowOrange)"/>
+              <path class="flow-motion" d="M345 390 L345 467"/>
+              <path class="flow-hit" d="M345 390 L345 467"/>
+              <text x="250" y="438" class="flow-label">지표 흡수 <tspan id="svgSurfaceSolar">45</tspan> ↓</text>
+            </g>
+
+            <g id="flow-surfaceIR" class="flow-group" data-step="4" data-flow="surfaceIR">
+              <path class="flow-base" d="M555 475 C545 420 548 355 565 288" stroke="#ff6f7d" marker-end="url(#arrowRed)"/>
+              <path class="flow-motion" d="M555 475 C545 420 548 355 565 288"/>
+              <path class="flow-hit" d="M555 475 C545 420 548 355 565 288"/>
+              <text x="485" y="445" class="flow-label">지표 적외선 <tspan id="svgSurfaceIR">104</tspan> ↑</text>
+            </g>
+
+            <g id="flow-window" class="flow-group" data-step="5" data-flow="window">
+              <path class="flow-base" d="M590 470 C625 365 630 235 623 112" stroke="#ff9ec6" marker-end="url(#arrowPink)"/>
+              <path class="flow-motion" d="M590 470 C625 365 630 235 623 112"/>
+              <path class="flow-hit" d="M590 470 C625 365 630 235 623 112"/>
+              <text x="630" y="235" class="flow-label"><tspan id="svgWindowName">대기의 창</tspan> <tspan id="svgWindow">4</tspan> ↑</text>
+            </g>
+
+            <g id="flow-atmAbsorb" class="flow-group" data-step="6" data-flow="atmAbsorb">
+              <path class="flow-base" d="M565 395 C575 370 590 350 610 335" stroke="#ff6f7d" marker-end="url(#arrowRed)"/>
+              <path class="flow-motion" d="M565 395 C575 370 590 350 610 335"/>
+              <path class="flow-hit" d="M565 395 C575 370 590 350 610 335"/>
+              <text x="535" y="382" class="flow-label">대기 흡수 <tspan id="svgAtmAbsorb">100</tspan></text>
+            </g>
+
+            <g id="flow-atmSpace" class="flow-group" data-step="7" data-flow="atmSpace">
+              <path class="flow-base" d="M740 298 C730 230 745 165 770 105" stroke="#ff6f7d" marker-end="url(#arrowRed)"/>
+              <path class="flow-motion" d="M740 298 C730 230 745 165 770 105"/>
+              <path class="flow-hit" d="M740 298 C730 230 745 165 770 105"/>
+              <text x="754" y="192" class="flow-label">대기→우주 <tspan id="svgAtmSpace">66</tspan> ↑</text>
+            </g>
+
+            <g id="flow-back" class="flow-group" data-step="7" data-flow="back">
+              <path class="flow-base" d="M815 330 C825 382 820 430 800 468" stroke="#ff9ec6" marker-end="url(#arrowPink)"/>
+              <path class="flow-motion" d="M815 330 C825 382 820 430 800 468"/>
+              <path class="flow-hit" d="M815 330 C825 382 820 430 800 468"/>
+              <text x="814" y="402" class="flow-label">재복사 <tspan id="svgBack">88</tspan> ↓</text>
+            </g>
+
+            <g id="flow-nonrad" class="flow-group" data-step="8" data-flow="nonrad">
+              <path class="flow-base" d="M900 472 C885 435 885 398 900 360" stroke="#6edcf3" stroke-dasharray="8 7" marker-end="url(#arrowCyan)"/>
+              <path class="flow-motion" d="M900 472 C885 435 885 398 900 360"/>
+              <path class="flow-hit" d="M900 472 C885 435 885 398 900 360"/>
+              <text x="878" y="342" text-anchor="middle" class="flow-label">전도·대류 <tspan id="svgNonrad">8</tspan> ↑</text>
+            </g>
+
+            <g id="flow-latent" class="flow-group" data-step="8" data-flow="latent">
+              <path class="flow-base" d="M952 472 C940 435 940 398 952 360" stroke="#6edcf3" stroke-dasharray="3 6" marker-end="url(#arrowCyan)"/>
+              <path class="flow-motion" d="M952 472 C940 435 940 398 952 360"/>
+              <path class="flow-hit" d="M952 472 C940 435 940 398 952 360"/>
+              <text x="952" y="335" text-anchor="middle" class="flow-label">숨은열 <tspan id="svgLatent">21</tspan> ↑</text>
+            </g>
+
+            <g transform="translate(675 22)" id="svgBalanceBox">
+              <rect width="300" height="72" rx="12" class="boundary-box"/>
+              <circle cx="20" cy="23" r="6" class="equilibrium-dot" id="equilibriumDot" fill="#67e1a2"/>
+              <text x="35" y="29" class="boundary-main" id="svgBalanceStatus">복사 평형</text>
+              <text x="20" y="53" class="boundary-sub" id="svgBalanceText">유입 100 / 유출 100 / 순변화 0</text>
+            </g>
+
+            <text x="410" y="575" class="scene-title">지표 온도 변화 <tspan id="svgTemp">+0.0 °C</tspan></text>
+            <text x="410" y="607" class="scene-title">대기 기온 변화 <tspan id="svgAirTemp">+0.0 °C</tspan></text>
+            <text x="410" y="635" class="scene-small">지표와 대기 모두 F ∝ T⁴를 단순 적용한 교육용 복사온도 상대값</text>
+          </svg>
+        </div>
+
+        <div class="legend" aria-label="범례">
+          <span><i class="legend-line"></i>단파복사(태양)</span>
+          <span><i class="legend-line longwave"></i>장파복사(적외선)</span>
+          <span><i class="legend-line nonrad"></i>전도·대류 / 숨은열</span>
+          <span>화살표 굵기·밝기·흐름 밀도 ∝ 에너지</span>
+        </div>
+
+        <div class="flow-detail" aria-live="polite">
+          <strong id="detailTitle">① 태양 복사 100</strong>
+          <p id="detailText">우주에서 지구 시스템으로 들어오는 단파복사입니다. 모든 에너지 값의 기준을 100으로 둡니다.</p>
+        </div>
+
+        <nav class="step-strip" aria-label="단계별 보기">
+          <button type="button" class="step-button active" data-go-step="1">1<br>유입</button>
+          <button type="button" class="step-button" data-go-step="2">2<br>반사</button>
+          <button type="button" class="step-button" data-go-step="3">3<br>흡수</button>
+          <button type="button" class="step-button" data-go-step="4">4<br>지표 방출</button>
+          <button type="button" class="step-button" data-go-step="5">5<br>대기의 창</button>
+          <button type="button" class="step-button" data-go-step="6">6<br>대기 흡수</button>
+          <button type="button" class="step-button" data-go-step="7">7<br>재방출</button>
+          <button type="button" class="step-button" data-go-step="8">8<br>온난화</button>
+          <button type="button" class="step-button" data-go-step="9">9<br>평형</button>
+        </nav>
+      </section>
+
+      <aside class="side-panel" aria-label="조절 및 실시간 정보">
+        <section class="card">
+          <div class="panel-section">
+            <h2 class="panel-title">온실효과 강도 <span class="scene-small">(상대값)</span></h2>
+            <div class="slider-head">
+              <label for="ghgSlider">모형 강도 조절</label>
+              <div class="slider-results"><output id="ghgValue" class="slider-value">현재 기준 · 50</output><output id="equilibriumProgress" class="equilibrium-progress complete">✓ 현재 평형 완료</output></div>
+            </div>
+            <input id="ghgSlider" type="range" min="0" max="100" value="50" step="25" list="ghgTicks" aria-describedby="ghgHelp">
+            <datalist id="ghgTicks"><option value="0"></option><option value="25"></option><option value="50"></option><option value="75"></option><option value="100"></option></datalist>
+            <div class="ghg-presets" aria-label="온실효과 강도 빠른 선택">
+              <button type="button" class="ghg-preset" data-ghg="0"><strong>0</strong>대기 없음</button>
+              <button type="button" class="ghg-preset" data-ghg="25"><strong>25</strong>낮음</button>
+              <button type="button" class="ghg-preset active" data-ghg="50"><strong>50</strong>현재 기준</button>
+              <button type="button" class="ghg-preset" data-ghg="75"><strong>75</strong>높음</button>
+              <button type="button" class="ghg-preset" data-ghg="100"><strong>100</strong>매우 높음</button>
+            </div>
+            <p class="range-note" id="ghgHelp">1~100에서는 구름과 단파 수지를 고정하고 대기의 적외선 흡수 강도만 변화시킵니다. 0은 대기 전체가 없는 비교 상태입니다.</p>
+
+            <div class="temp-box">
+              <div>
+                <div class="thermometer" aria-hidden="true"><div class="thermometer-fill" id="tempFill"></div></div>
+                <span class="scene-small">기준 대비 지표 온도</span>
+              </div>
+              <output class="temp-value" id="tempValue">+0.0 °C</output>
+            </div>
+            <div class="temp-box">
+              <div>
+                <div class="thermometer" aria-hidden="true"><div class="thermometer-fill" id="airTempFill"></div></div>
+                <span class="scene-small">기준 대비 대기 기온</span>
+              </div>
+              <output class="temp-value" id="airTempValue">+0.0 °C</output>
+            </div>
+          </div>
+          <div class="panel-section">
+            <div class="balance" id="balanceBox" aria-live="polite">
+              <div class="balance-title" id="balanceTitle">● 복사 평형 상태</div>
+              <div class="balance-equation" id="balanceEquation">유입 100 = 반사 30 + 장파복사 70</div>
+              <div class="balance-number" id="balanceNumber">순변화 0.0</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="panel-section">
+            <h2 class="panel-title">실시간 에너지 수지 <span class="scene-small">(상대 단위)</span></h2>
+            <dl class="metrics">
+              <dt>태양 입사 에너지</dt><dd id="mIncoming">100</dd>
+              <dt>반사 에너지</dt><dd id="mReflected">30</dd>
+              <dt>지구 시스템 흡수</dt><dd id="mAbsorbed">70</dd>
+              <dt>대기 태양 흡수</dt><dd id="mAtmSolar">25</dd>
+              <dt>지표 태양 흡수</dt><dd id="mSurfaceSolar">45</dd>
+              <dt class="section-start">지표 방출</dt><dd class="section-start" id="mSurfaceIR">104</dd>
+              <dt>대기 적외선 흡수</dt><dd id="mAtmAbsorb">100</dd>
+              <dt>대기 재복사</dt><dd id="mBack">88</dd>
+              <dt id="mWindowLabel">대기의 창 → 우주</dt><dd id="mWindow">4</dd>
+              <dt>대기 → 우주</dt><dd id="mAtmSpace">66</dd>
+              <dt>전도·대류</dt><dd id="mNonrad">8</dd>
+              <dt>숨은열</dt><dd id="mLatent">21</dd>
+              <dt class="section-start">우주 경계 유입</dt><dd class="section-start" id="mToaIn">100</dd>
+              <dt>우주 경계 유출</dt><dd id="mToaOut">100</dd>
+              <dt>순에너지 변화</dt><dd id="mNet">0</dd>
+            </dl>
+            <div class="formula" id="budgetCheck">지표 수지 133 = 133 · 대기 수지 154 = 154<br>우주 경계면 100 = 30 + 66 + 4</div>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+    <details class="card theory">
+      <summary>개념 설명 펼치기</summary>
+      <div class="theory-grid">
+        <article class="theory-item"><h3>복사 평형</h3><p>지구는 태양으로부터 주로 짧은 파장의 단파복사를 받고, 우주로는 주로 긴 파장의 적외선을 방출합니다. 장기적으로 들어오는 에너지와 나가는 에너지가 같으면 평균 기온은 안정적인 복사 평형을 이룹니다.</p></article>
+        <article class="theory-item"><h3>알베도와 반사</h3><p>입사 태양 복사 100 중 30이 우주로 반사되는 단순 모형입니다. 행성 반사율, 즉 알베도는 30%입니다. 구름·대기와 지표의 반사율이 높아지면 흡수되는 태양 에너지가 줄어 냉각 경향이 나타날 수 있습니다.</p></article>
+        <article class="theory-item"><h3>자연 온실효과</h3><p>지표는 태양 복사를 흡수한 뒤 적외선을 방출합니다. 수증기, 이산화탄소, 메탄 등 온실기체는 이 적외선의 일부를 흡수한 뒤 모든 방향으로 재방출합니다. 아래 방향 재방출은 지표가 받는 에너지를 늘려 대기가 없을 때보다 지표를 따뜻하게 합니다.</p></article>
+        <article class="theory-item"><h3>대기의 창</h3><p>모든 적외선이 대기에 흡수되는 것은 아닙니다. 일부 파장대의 적외선은 대기의 창을 통해 대기에 크게 흡수되지 않고 우주로 직접 빠져나갑니다. 온실기체가 늘어나면 흡수 파장 범위가 넓어져 이 직접 방출 경로가 약해질 수 있습니다.</p></article>
+        <article class="theory-item"><h3>온실기체 증가와 온난화</h3><p>온실기체가 증가하면 처음에는 우주로 빠져나가는 적외선이 줄어 에너지가 축적됩니다. 지표와 대기는 따뜻해지며 더 많은 적외선을 방출하고, 우주 유출이 다시 유입과 같아질 때 이전보다 높은 온도에서 새 평형에 도달합니다.</p></article>
+        <article class="theory-item"><h3>온실기체가 하는 일</h3><p>온실기체가 에너지를 만들어 내거나 영구히 가두는 것은 아닙니다. 지표 적외선의 우주 방출 경로, 유효 방출 고도와 복사 흐름을 바꿉니다. 평형에 도달하면 우주 경계면의 유입과 유출은 다시 같아집니다.</p></article>
+      </div>
+    </details>
+  </main>
+
+  <script>
+    (() => {
+      'use strict';
+
+      // 고정된 단파복사, 전도·대류와 숨은열 전달: 입사 태양복사를 100으로 정규화한다.
+      const FIXED = Object.freeze({ incoming: 100, cloudReflect: 26, surfaceReflect: 4, atmSolar: 25, surfaceSolar: 45, nonrad: 8, latent: 21 });
+      const BASE = Object.freeze({ surfaceIR: 104, window: 4, atmAbsorb: 100, atmSpace: 66, back: 88 });
+      const BASE_BUDGET = Object.freeze({ incoming: 100, reflected: 30, absorbed: 70, atmSolar: 25, surfaceSolar: 45, nonrad: 8, latent: 21, surfaceIR: 104, window: 4, atmAbsorb: 100, atmSpace: 66, back: 88, atmInput: 154, toaOut: 100, surfaceIn: 133, surfaceOut: 133 });
+      const BASE_ABSORPTION_FRACTION = BASE.atmAbsorb / BASE.surfaceIR;
+      const BASE_DOWN_FRACTION = BASE.back / (FIXED.atmSolar + BASE.atmAbsorb + FIXED.nonrad + FIXED.latent);
+      const BASE_AIR_TEMPERATURE = 255;
+
+      const state = {
+        ghg: 50,
+        temp: 0,
+        running: false,
+        stepMode: true,
+        step: 1,
+        stepClock: 0,
+        lastTime: performance.now(),
+        display: {},
+        selectedFlow: 'incoming',
+        activatedFlows: new Set(['incoming']),
+        selectedZone: null,
+        equilibriumHold: 1,
+        equilibriumComplete: true
+      };
+
+      // 사용자가 뒤쪽 흐름을 선택해도 앞에서 거친 에너지 경로가 모두 누적되어 보이도록 하는 순서이다.
+      const flowSequence = ['incoming', 'surfaceReflect', 'cloudReflect', 'atmSolar', 'surfaceSolar', 'surfaceIR', 'window', 'atmAbsorb', 'atmSpace', 'back', 'nonrad', 'latent'];
+
+      const stepInfo = [
+        ['태양 복사 유입', '태양 복사 100이 우주에서 지구 시스템으로 들어옵니다.'],
+        ['반사', '지표에서 4가 먼저 반사되고, 구름·대기에서 26이 반사되어 전체 30이 우주로 돌아갑니다.'],
+        ['단파복사 흡수', '대기가 25, 지표가 45를 흡수하여 지구 시스템은 모두 70을 얻습니다.'],
+        ['지표 적외선 방출', '따뜻해진 지표가 장파복사를 위로 방출합니다. 기준 상태의 값은 104입니다.'],
+        ['대기의 창', '지표 적외선 일부는 대기의 창을 통해 곧바로 우주로 빠져나갑니다.'],
+        ['대기 적외선 흡수', '대기의 창을 통과하지 못한 지표 적외선을 온실기체가 흡수합니다.'],
+        ['대기 재방출', '대기는 받은 에너지를 우주 방향과 지표 방향으로 재방출합니다.'],
+        ['재복사와 온난화', '아래 방향 재복사는 지표가 받는 에너지를 늘리고, 따뜻해진 지표는 더 많이 방출합니다.'],
+        ['우주 경계면 평형', '유입과 유출을 비교합니다. 평형에서는 순에너지 변화가 0입니다.']
+      ];
+
+      const flowMeta = {
+        incoming: ['태양 복사', '우주에서 지구로 들어오는 단파복사이며 모든 값의 기준입니다.', () => FIXED.incoming],
+        cloudReflect: ['구름·대기 반사', '구름과 대기에서 반사되어 우주로 돌아가는 단파복사입니다.', v => v.cloudReflect],
+        surfaceReflect: ['지표 반사', '지표에서 반사되어 우주로 돌아가는 단파복사입니다.', v => v.surfaceReflect],
+        atmSolar: ['대기 태양 흡수', '대기가 직접 흡수하는 태양 단파복사입니다.', v => v.atmSolar],
+        surfaceSolar: ['지표 태양 흡수', '지표를 데우는 태양 단파복사입니다.', v => v.surfaceSolar],
+        surfaceIR: ['지표 적외선 방출', '지표 온도가 오르면 T⁴ 관계를 단순화한 식에 따라 비선형적으로 증가합니다.', v => v.surfaceIR],
+        window: ['대기의 창', '대기에 크게 흡수되지 않고 지표에서 우주로 직접 나가는 적외선입니다.', v => v.window],
+        atmAbsorb: ['대기 적외선 흡수', '지표 적외선 중 대기의 창을 통과하지 못하고 온실기체에 흡수되는 양입니다.', v => v.atmAbsorb],
+        atmSpace: ['대기의 우주 방출', '대기가 흡수한 에너지 중 우주 방향으로 재방출되는 장파복사입니다.', v => v.atmSpace],
+        back: ['대기 재복사', '대기가 지표 방향으로 재방출해 지표가 받는 에너지를 늘리는 장파복사입니다.', v => v.back],
+        nonrad: ['전도·대류', '지표에서 대기로 전도와 대류로 전달되는 에너지를 단순화한 값입니다.', v => v.nonrad],
+        latent: ['숨은열', '물의 증발과 응결 과정에서 지표에서 대기로 전달되는 에너지입니다.', v => v.latent]
+      };
+
+      const $ = id => document.getElementById(id);
+      const els = {
+        sceneWrap: $('sceneWrap'), playBtn: $('playBtn'), pauseBtn: $('pauseBtn'), resetBtn: $('resetBtn'), stepModeBtn: $('stepModeBtn'),
+        stepNumber: $('stepNumber'), stepShort: $('stepShort'), ghgSlider: $('ghgSlider'), ghgValue: $('ghgValue'), equilibriumProgress: $('equilibriumProgress'), ghgHelp: $('ghgHelp'), tempValue: $('tempValue'), tempFill: $('tempFill'), airTempValue: $('airTempValue'), airTempFill: $('airTempFill'),
+        balanceBox: $('balanceBox'), balanceTitle: $('balanceTitle'), balanceEquation: $('balanceEquation'), balanceNumber: $('balanceNumber'), budgetCheck: $('budgetCheck'),
+        detailTitle: $('detailTitle'), detailText: $('detailText'), surfaceGlow: $('surfaceGlow'), equilibriumDot: $('equilibriumDot'), svgBalanceStatus: $('svgBalanceStatus'),
+        svgBalanceText: $('svgBalanceText'), svgTemp: $('svgTemp')
+      };
+
+      function greenhouseLabel(g) {
+        if (g < 1) return '대기 없음(비교)';
+        if (g < 20) return '매우 낮음';
+        if (g < 63) return g === 50 ? '현재 기준' : '낮음';
+        if (g < 88) return '높음';
+        return '매우 높음';
+      }
+
+      // 0은 대기 전체를 제거한 별도의 비교 상태이다. 1~100에서는 구름·단파 수지는 고정하고 적외선 흡수 강도만 바꾼다.
+      function greenhouseParameters(g) {
+        const atmosphereStrength = g === 0 ? 0 : 1;
+        const absorptionK = -Math.log(1 - BASE_ABSORPTION_FRACTION) / 50;
+        const absorptionFraction = 1 - Math.exp(-absorptionK * g);
+        const downFraction = Math.max(.48, Math.min(.72, BASE_DOWN_FRACTION + .065 * (g - 50) / 50));
+        return { atmosphereStrength, absorptionFraction, downFraction };
+      }
+
+      // 지표 방출은 기준 절대온도 288 K에 대한 스테판-볼츠만 T⁴ 비례를 단순화해 계산한다.
+      function calculate(temp = state.temp, ghg = state.ghg) {
+        const p = greenhouseParameters(ghg);
+        const cloudReflect = FIXED.cloudReflect * p.atmosphereStrength;
+        const surfaceReflect = 30 - cloudReflect;
+        const atmSolar = FIXED.atmSolar * p.atmosphereStrength;
+        const surfaceSolar = 70 - atmSolar;
+        const nonrad = FIXED.nonrad * p.atmosphereStrength;
+        const latent = FIXED.latent * p.atmosphereStrength;
+        const surfaceIR = BASE.surfaceIR * Math.pow((288 + temp) / 288, 4);
+        const atmAbsorb = surfaceIR * p.absorptionFraction;
+        const window = surfaceIR - atmAbsorb;
+        const atmInput = atmSolar + atmAbsorb + nonrad + latent;
+        // 대기가 받은 전체 에너지를 위·아래 방향으로 재복사하며, 두 방출량의 합은 항상 대기 유입과 같다.
+        const back = atmInput * p.downFraction;
+        const atmSpace = atmInput - back;
+        const longwaveOut = window + atmSpace;
+        const toaOut = cloudReflect + surfaceReflect + longwaveOut;
+        const net = FIXED.incoming - toaOut;
+        const surfaceIn = surfaceSolar + back;
+        const surfaceOut = surfaceIR + nonrad + latent;
+        // 대기 기온 변화는 대기 총방출(=총흡수)에 T⁴ 관계를 적용한 교육용 복사온도 상대값이다.
+        const airTemp = ghg === 0 ? null : BASE_AIR_TEMPERATURE * (Math.pow(atmInput / 154, .25) - 1);
+        return { incoming: 100, cloudReflect, surfaceReflect, atmSolar, surfaceSolar, nonrad, latent, reflected: 30, absorbed: 70, surfaceIR, window, atmAbsorb, atmInput, back, atmSpace, longwaveOut, toaOut, net, surfaceIn, surfaceOut, airTemp };
+      }
+
+      function fmt(value, forceOne = false) {
+        if (Math.abs(value) < .045) value = 0;
+        if (!forceOne && Math.abs(value - Math.round(value)) < .045) return String(Math.round(value));
+        return value.toFixed(1);
+      }
+
+      // 현재 값이 기준 상태(강도 50)와 다르면 붉게 표시하고 기준값을 함께 보여 준다.
+      function budgetValue(value, baseline) {
+        const changed = Math.abs(value - baseline) >= .05;
+        return `<strong class="${changed ? 'changed-value' : 'baseline-value'}">${fmt(value)}</strong>${changed ? ` <span class="baseline-note">(기준 ${fmt(baseline)})</span>` : ''}`;
+      }
+
+      function updatePresetButtons() {
+        document.querySelectorAll('.ghg-preset').forEach(button => {
+          const active = Number(button.dataset.ghg) === state.ghg;
+          button.classList.toggle('active', active);
+          button.setAttribute('aria-pressed', String(active));
+        });
+      }
+
+      function setText(id, value) {
+        const el = $(id);
+        if (el) el.textContent = value;
+      }
+
+      // 숫자가 갑자기 뛰지 않도록 표시값만 현재 계산값을 향해 부드럽게 보간한다.
+      function smoothValue(key, target, amount) {
+        if (!Number.isFinite(state.display[key])) state.display[key] = target;
+        state.display[key] += (target - state.display[key]) * amount;
+        if (Math.abs(target - state.display[key]) < .003) state.display[key] = target;
+        return state.display[key];
+      }
+
+      function flowWidth(value) { return Math.max(2.2, Math.min(11, 2 + value / 15)); }
+      function styleFlow(name, value) {
+        const group = $('flow-' + name);
+        if (!group) return;
+        group.classList.toggle('zero-flow', value < .05);
+        const base = group.querySelector('.flow-base');
+        const motion = group.querySelector('.flow-motion');
+        const width = flowWidth(value);
+        const gap = Math.max(8, 28 - Math.sqrt(Math.max(value, 0)) * 1.45);
+        base.style.strokeWidth = width;
+        base.style.setProperty('--flow-width', `${width}px`);
+        base.style.opacity = String(.48 + .5 * Math.min(value / 104, 1));
+        motion.style.strokeWidth = Math.max(1.3, width * .28);
+        motion.style.strokeDasharray = `3 ${gap.toFixed(1)}`;
+      }
+
+      function updateFlowVisibility() {
+        document.querySelectorAll('.flow-group').forEach(group => {
+          const required = Number(group.dataset.step);
+          const isActivated = state.activatedFlows.has(group.dataset.flow);
+          group.classList.toggle('visible', state.stepMode ? isActivated : required <= state.step || isActivated);
+          group.classList.toggle('active', state.stepMode ? group.dataset.flow === state.selectedFlow : required === state.step || (state.step === 8 && ['back','surfaceIR','nonrad','latent'].includes(group.dataset.flow)));
+          group.classList.toggle('activated', state.activatedFlows.has(group.dataset.flow));
+        });
+        document.querySelectorAll('.step-button').forEach(btn => btn.classList.toggle('active', Number(btn.dataset.goStep) === state.step));
+        els.stepNumber.textContent = `${state.step}단계`;
+        els.stepShort.textContent = stepInfo[state.step - 1][0];
+      }
+
+      function selectFlow(name, values) {
+        state.selectedZone = null;
+        document.querySelectorAll('.zone-control').forEach(control => control.classList.remove('selected'));
+        state.selectedFlow = name;
+        const meta = flowMeta[name];
+        if (!meta) return;
+        const selectedIndex = flowSequence.indexOf(name);
+        flowSequence.slice(0, selectedIndex + 1).forEach(flow => state.activatedFlows.add(flow));
+        document.querySelectorAll('.flow-group').forEach(group => {
+          group.classList.toggle('selected', group.dataset.flow === name);
+          group.classList.toggle('activated', state.activatedFlows.has(group.dataset.flow));
+          group.querySelector('.flow-hit')?.setAttribute('aria-pressed', String(group.dataset.flow === name));
+        });
+        const value = meta[2](values || calculate());
+        els.detailTitle.textContent = `${meta[0]} ${fmt(value)}`;
+        els.detailText.textContent = meta[1];
+      }
+
+      function selectZone(zone, values = calculate()) {
+        state.selectedZone = zone;
+        document.querySelectorAll('.zone-control').forEach(control => control.classList.toggle('selected', control.dataset.zone === zone));
+        document.querySelectorAll('.flow-group').forEach(group => group.classList.remove('selected'));
+        if (zone === 'space') {
+          const sign = Math.abs(values.net) < .08 ? '=' : values.net > 0 ? '>' : '<';
+          els.detailTitle.textContent = `① 우주 경계면 · ${Math.abs(values.net) < .08 ? '복사 평형' : '에너지 불균형'}`;
+          els.detailText.innerHTML = `유입 ${budgetValue(100, 100)} ${sign} 유출 ${budgetValue(values.toaOut, 100)} (반사 ${budgetValue(30, 30)} + 대기 방출 ${budgetValue(values.atmSpace, 66)} + 지표 직접 방출 ${budgetValue(values.window, 4)}) · 순변화 ${budgetValue(values.net, 0)}`;
+        } else if (zone === 'atmosphere') {
+          if (state.ghg === 0) {
+            els.detailTitle.textContent = '② 대기와 구름 · 대기 없음';
+            els.detailText.innerHTML = `교육용 극한 상태: 유입 ${budgetValue(0, 154)} = 유출 ${budgetValue(0, 154)}`;
+          } else {
+            els.detailTitle.textContent = '② 대기와 구름 · 순간 에너지 수지';
+            els.detailText.innerHTML = `유입 ${budgetValue(values.atmInput, 154)} (태양 흡수 ${budgetValue(values.atmSolar, 25)} + 지표 적외선 흡수 ${budgetValue(values.atmAbsorb, 100)} + 전도·대류 ${budgetValue(values.nonrad, 8)} + 숨은열 ${budgetValue(values.latent, 21)}) = 유출 ${budgetValue(values.atmSpace + values.back, 154)} (우주 방출 ${budgetValue(values.atmSpace, 66)} + 재복사 ${budgetValue(values.back, 88)})`;
+          }
+        } else {
+          const surfaceNet = values.surfaceIn - values.surfaceOut;
+          const sign = Math.abs(surfaceNet) < .08 ? '=' : surfaceNet > 0 ? '>' : '<';
+          els.detailTitle.textContent = `③ 지표 · ${Math.abs(surfaceNet) < .08 ? '에너지 평형' : surfaceNet > 0 ? '에너지 축적·온난화' : '에너지 감소·냉각'}`;
+          els.detailText.innerHTML = `유입 ${budgetValue(values.surfaceIn, 133)} (태양 흡수 ${budgetValue(values.surfaceSolar, 45)} + 재복사 ${budgetValue(values.back, 88)}) ${sign} 유출 ${budgetValue(values.surfaceOut, 133)} (지표 적외선 ${budgetValue(values.surfaceIR, 104)} + 전도·대류 ${budgetValue(values.nonrad, 8)} + 숨은열 ${budgetValue(values.latent, 21)})`;
+        }
+      }
+
+      function updateUI(values, dt) {
+        const a = Math.min(1, dt * 7);
+        const shown = {};
+        ['surfaceIR','atmAbsorb','back','window','atmSpace','toaOut','net'].forEach(k => shown[k] = smoothValue(k, values[k], a));
+        shown.temp = smoothValue('temp', state.temp, a);
+
+        setText('mIncoming', '100'); setText('mReflected', '30'); setText('mAbsorbed', '70');
+        setText('mAtmSolar', fmt(values.atmSolar)); setText('mSurfaceSolar', fmt(values.surfaceSolar)); setText('mNonrad', fmt(values.nonrad)); setText('mLatent', fmt(values.latent)); setText('mToaIn', '100');
+        setText('mSurfaceIR', fmt(shown.surfaceIR)); setText('mAtmAbsorb', fmt(shown.atmAbsorb)); setText('mBack', fmt(shown.back));
+        setText('mWindow', fmt(shown.window)); setText('mAtmSpace', fmt(shown.atmSpace)); setText('mToaOut', fmt(shown.toaOut)); setText('mNet', fmt(shown.net));
+        setText('svgSurfaceIR', fmt(shown.surfaceIR)); setText('svgAtmAbsorb', fmt(shown.atmAbsorb)); setText('svgBack', fmt(shown.back));
+        setText('svgWindow', fmt(shown.window)); setText('svgAtmSpace', fmt(shown.atmSpace));
+        setText('svgWindowName', state.ghg === 0 ? '지표→우주 직접' : '대기의 창');
+        setText('mWindowLabel', state.ghg === 0 ? '지표 직접 방출 → 우주' : '대기의 창 → 우주');
+        setText('svgCloudReflect', fmt(values.cloudReflect)); setText('svgSurfaceReflect', fmt(values.surfaceReflect));
+        setText('svgAtmSolar', fmt(values.atmSolar)); setText('svgSurfaceSolar', fmt(values.surfaceSolar)); setText('svgNonrad', fmt(values.nonrad)); setText('svgLatent', fmt(values.latent));
+
+        // 값이 0인 대기 관련 항목은 목록에서도 제거해 '대기 없음' 상태를 단순하게 보여 준다.
+        ['mAtmSolar', 'mAtmAbsorb', 'mBack', 'mAtmSpace', 'mNonrad', 'mLatent'].forEach(id => {
+          const dd = $(id);
+          const shouldHide = Math.abs(Number(dd.textContent)) < .05;
+          dd.hidden = shouldHide;
+          if (dd.previousElementSibling) dd.previousElementSibling.hidden = shouldHide;
+        });
+
+        const tempText = `${shown.temp >= 0 ? '+' : ''}${shown.temp.toFixed(1)} °C`;
+        els.tempValue.textContent = tempText;
+        els.svgTemp.textContent = tempText;
+        els.tempFill.style.width = `${Math.max(4, Math.min(100, 35 + shown.temp * 6))}%`;
+        if (values.airTemp === null) {
+          els.airTempValue.textContent = '대기 없음';
+          setText('svgAirTemp', '대기 없음');
+          els.airTempFill.style.width = '0%';
+        } else {
+          const shownAirTemp = smoothValue('airTemp', values.airTemp, a);
+          const airTempText = `${shownAirTemp >= 0 ? '+' : ''}${shownAirTemp.toFixed(1)} °C`;
+          els.airTempValue.textContent = airTempText;
+          setText('svgAirTemp', airTempText);
+          els.airTempFill.style.width = `${Math.max(4, Math.min(100, 35 + shownAirTemp * 6))}%`;
+        }
+        els.surfaceGlow.style.opacity = String(Math.max(.18, Math.min(.92, .45 + shown.temp * .055)));
+        els.surfaceGlow.style.filter = `drop-shadow(0 0 ${Math.max(0, 5 + shown.temp * 2)}px rgba(255,103,95,.65))`;
+
+        const nearEq = Math.abs(values.net) < .08;
+        const warming = values.net > .08;
+        els.equilibriumProgress.classList.toggle('complete', state.equilibriumComplete);
+        els.equilibriumProgress.classList.toggle('moving', !state.equilibriumComplete);
+        els.equilibriumProgress.textContent = state.equilibriumComplete
+          ? (state.ghg === 50 && Math.abs(state.temp) < .08 ? '✓ 현재 평형 완료' : '✓ 새 평형 완료')
+          : !state.running ? '▶ 재생하여 평형 찾기' : warming ? '↗ 온난화·평형 이동 중' : values.net < -.08 ? '↘ 냉각·평형 이동 중' : '… 평형 확인 중';
+        els.balanceBox.classList.toggle('warming', warming);
+        els.balanceBox.classList.toggle('cooling', values.net < -.08);
+        els.balanceTitle.textContent = nearEq ? (Math.abs(state.temp) < .08 && state.ghg === 50 ? '● 복사 평형 상태' : '● 새로운 복사 평형에 접근') : warming ? '▲ 에너지 불균형: 유입 > 유출' : '▼ 에너지 불균형: 유입 < 유출';
+        els.balanceEquation.textContent = `유입 100 ${nearEq ? '=' : warming ? '>' : '<'} 반사 30 + 장파복사 ${fmt(values.longwaveOut)}`;
+        els.balanceNumber.textContent = `순변화 ${values.net >= 0 ? '+' : ''}${fmt(values.net, true)}`;
+        els.equilibriumDot.setAttribute('fill', nearEq ? '#67e1a2' : warming ? '#ff8a77' : '#6edcf3');
+        els.svgBalanceStatus.textContent = nearEq ? '복사 평형' : warming ? '온난화 진행' : '냉각 진행';
+        els.svgBalanceText.textContent = `유입 100 / 유출 ${fmt(values.toaOut)} / 순변화 ${values.net >= 0 ? '+' : ''}${fmt(values.net)}`;
+
+        const surfaceIn = values.surfaceSolar + values.back;
+        const surfaceOut = values.surfaceIR + values.nonrad + values.latent;
+        const atmIn = values.atmSolar + values.atmAbsorb + values.nonrad + values.latent;
+        const atmOut = values.atmSpace + values.back;
+        els.budgetCheck.innerHTML = state.ghg === 0
+          ? `대기 없는 극한 상태 · 지표 수지 ${fmt(surfaceIn)} 유입 / ${fmt(surfaceOut)} 유출<br>우주 유출 30 + 지표 직접 방출 ${fmt(values.window)}`
+          : `지표 수지 ${fmt(surfaceIn)} 유입 / ${fmt(surfaceOut)} 유출<br>대기 수지 ${fmt(atmIn)} = ${fmt(atmOut)} · 우주 유출 30 + ${fmt(values.atmSpace)} + ${fmt(values.window)}`;
+
+        styleFlow('incoming', 100); styleFlow('cloudReflect', values.cloudReflect); styleFlow('surfaceReflect', values.surfaceReflect); styleFlow('atmSolar', values.atmSolar); styleFlow('surfaceSolar', values.surfaceSolar);
+        // 대기가 없으면 지표 전체 방출과 직접 방출이 같은 흐름이므로 중복 화살표를 숨긴다.
+        styleFlow('surfaceIR', state.ghg === 0 ? 0 : values.surfaceIR); styleFlow('window', values.window); styleFlow('atmAbsorb', values.atmAbsorb);
+        styleFlow('atmSpace', values.atmSpace); styleFlow('back', values.back); styleFlow('nonrad', values.nonrad); styleFlow('latent', values.latent);
+        if (state.selectedZone) selectZone(state.selectedZone, values);
+        else selectFlow(state.selectedFlow, values);
+      }
+
+      function goStep(step, manual = false) {
+        state.selectedZone = null;
+        document.querySelectorAll('.zone-control').forEach(control => control.classList.remove('selected'));
+        state.step = Math.max(1, Math.min(9, step));
+        state.stepClock = 0;
+        if (state.step === 1) {
+          state.activatedFlows = new Set(['incoming']);
+          state.selectedFlow = 'incoming';
+        } else {
+          document.querySelectorAll('.flow-group').forEach(group => {
+            if (Number(group.dataset.step) <= state.step) state.activatedFlows.add(group.dataset.flow);
+          });
+          const reachedFlows = flowSequence.filter(flow => Number($('flow-' + flow).dataset.step) <= state.step);
+          state.selectedFlow = reachedFlows[reachedFlows.length - 1] || 'incoming';
+        }
+        if (manual) {
+          setControlMode('step');
+        }
+        updateFlowVisibility();
+        els.detailTitle.textContent = `${state.step}단계 · ${stepInfo[state.step - 1][0]}`;
+        els.detailText.textContent = stepInfo[state.step - 1][1];
+      }
+
+      function setControlMode(mode) {
+        if (mode === 'play') {
+          state.running = true;
+          state.stepMode = false;
+          els.sceneWrap.classList.remove('paused');
+        } else if (mode === 'step') {
+          state.running = false;
+          state.stepMode = true;
+          els.sceneWrap.classList.add('paused');
+        } else {
+          state.running = false;
+          state.stepMode = false;
+          els.sceneWrap.classList.add('paused');
+        }
+        els.playBtn.setAttribute('aria-pressed', String(mode === 'play'));
+        els.pauseBtn.setAttribute('aria-pressed', String(mode === 'pause'));
+        els.stepModeBtn.setAttribute('aria-pressed', String(state.stepMode));
+        updateFlowVisibility();
+      }
+
+      els.playBtn.addEventListener('click', () => setControlMode('play'));
+      els.pauseBtn.addEventListener('click', () => setControlMode('pause'));
+      els.resetBtn.addEventListener('click', () => {
+        state.ghg = 50; state.temp = 0; state.step = 1; state.stepClock = 0; state.display = {}; state.selectedFlow = 'incoming'; state.activatedFlows = new Set(['incoming']); state.selectedZone = null; state.equilibriumHold = 1; state.equilibriumComplete = true;
+        document.querySelectorAll('.zone-control').forEach(control => control.classList.remove('selected'));
+        els.ghgSlider.value = '50'; els.ghgValue.textContent = '현재 기준 · 50'; els.ghgHelp.textContent = '1~100에서는 구름과 단파 수지를 고정하고 대기의 적외선 흡수 강도만 변화시킵니다. 0은 대기 전체가 없는 비교 상태입니다.';
+        updatePresetButtons();
+        setControlMode('step'); goStep(1); updateUI(calculate(), .2);
+      });
+      els.stepModeBtn.addEventListener('click', () => setControlMode('step'));
+      els.ghgSlider.addEventListener('input', event => {
+        state.ghg = Number(event.target.value);
+        state.equilibriumHold = 0;
+        state.equilibriumComplete = false;
+        els.ghgValue.textContent = `${greenhouseLabel(state.ghg)} · ${state.ghg}`;
+        updatePresetButtons();
+        els.ghgHelp.textContent = state.ghg === 0
+          ? '비교용 극한 상태: 온실기체만이 아니라 대기와 구름 전체를 제거합니다. 지표가 흡수한 에너지는 적외선으로 우주에 직접 방출됩니다.'
+          : '구름과 단파 수지는 고정됩니다. 값을 높이면 대기의 적외선 흡수와 아래 방향 재방출이 커지고 대기의 창은 좁아집니다.';
+        setControlMode('play');
+        if (state.step < 8) goStep(8);
+        if (state.ghg === 0) selectFlow('window', calculate());
+      });
+      document.querySelectorAll('.ghg-preset').forEach(button => {
+        button.addEventListener('click', () => {
+          els.ghgSlider.value = button.dataset.ghg;
+          els.ghgSlider.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+      });
+      document.querySelectorAll('.step-button').forEach(btn => btn.addEventListener('click', () => goStep(Number(btn.dataset.goStep), true)));
+      document.querySelectorAll('.flow-group').forEach(group => {
+        const choose = () => selectFlow(group.dataset.flow, calculate());
+        const activate = () => {
+          choose();
+          setControlMode('step');
+          state.step = Number(group.dataset.step);
+          updateFlowVisibility();
+        };
+        const hit = group.querySelector('.flow-hit');
+        hit.setAttribute('tabindex', '0');
+        hit.setAttribute('role', 'button');
+        hit.setAttribute('aria-pressed', 'false');
+        hit.setAttribute('aria-label', `${flowMeta[group.dataset.flow][0]} 설명 보기`);
+        hit.addEventListener('click', activate);
+        hit.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activate(); } });
+      });
+      document.querySelectorAll('.zone-control').forEach(control => {
+        const showBudget = () => selectZone(control.dataset.zone, calculate());
+        control.addEventListener('click', showBudget);
+        control.addEventListener('keydown', event => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            showBudget();
+          }
+        });
+      });
+
+      function frame(now) {
+        const dt = Math.min(.05, (now - state.lastTime) / 1000 || 0);
+        state.lastTime = now;
+        let values = calculate();
+
+        if (state.running) {
+          // 우주 경계면의 순흡수 에너지를 열저장에 반영한다. 계수는 학습용 시간척도이다.
+          state.temp += values.net * dt * .4;
+          state.temp = Math.max(-100, Math.min(50, state.temp));
+          values = calculate();
+
+          if (!state.stepMode) {
+            state.stepClock += dt;
+            if (state.stepClock > 2.25) goStep(state.step === 9 ? 1 : state.step + 1);
+          }
+        }
+
+        if (Math.abs(values.net) < .08) {
+          state.equilibriumHold += dt;
+          if (state.equilibriumHold >= .8) state.equilibriumComplete = true;
+        } else {
+          state.equilibriumHold = 0;
+          state.equilibriumComplete = false;
+        }
+
+        updateUI(values, dt);
+        requestAnimationFrame(frame);
+      }
+
+      els.ghgValue.textContent = '현재 기준 · 50';
+      updatePresetButtons();
+      goStep(1);
+      updateUI(calculate(), .2);
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
